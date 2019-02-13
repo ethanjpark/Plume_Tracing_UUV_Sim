@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /TF1/Frames1
+        - /PointCloud1
       Splitter Ratio: 0.7214760184288025
     Tree Height: 710
   - Class: rviz/Selection
@@ -325,8 +326,8 @@ Visualization Manager:
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.009999999776482582
-      Style: Flat Squares
+      Size (m): 0.5
+      Style: Spheres
       Topic: /plume/particles
       Unreliable: false
       Use Fixed Frame: true
@@ -357,7 +358,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 77.8869400024414
+      Distance: 71.3951644897461
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -372,10 +373,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7353973984718323
+      Pitch: 0.1303979456424713
       Target Frame: rexrov/base_link
       Value: Orbit (rviz)
-      Yaw: 3.1685783863067627
+      Yaw: 4.828576564788818
     Saved: ~
 Window Geometry:
   Displays:

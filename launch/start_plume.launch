@@ -1,9 +1,9 @@
 <launch>
 
   <!-- Load turbulent plume -->
-  <node name="turbplume" pkg="uuv_plume_simulator" type="set_demo_turbulent_plume" output="screen"/>
+  <node name="turbplume" pkg="pt_uuvsim" type="turbulent_plume" output="screen"/>
 
   <!-- Set current velocity -->
-  <node name="currvel" pkg="uuv_plume_simulator" type="set_demo_current_vel" output="screen"/>
+  <node name="currvel" pkg="pt_uuvsim" type="set_currvel" output="screen"/>
 
 </launch>

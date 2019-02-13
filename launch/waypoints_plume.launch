@@ -23,7 +23,7 @@
       <arg name="model_name" value="rexrov"/>
     </include>
 
-    <include file="$(find uuv_control_utils)/launch/send_waypoints_file.launch">
+    <include file="$(find pt_uuvsim)/launch/send_waypoints.launch">
       <arg name="uuv_name" value="rexrov"/>
     </include>
 
