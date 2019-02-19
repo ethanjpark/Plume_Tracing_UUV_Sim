@@ -1,3 +1,8 @@
+<!--Launch file copy of "send_waypoints_file.launch"
+    in package "uuv_control_utils". Full file path:
+    catkin_ws/src/uuv_simulator/uuv_control/uuv_control_utils/launch/send_waypoints_file.launch"
+-->
+
 <launch>
   <arg name="uuv_name" />
   <arg name="filename" default="$(find pt_uuvsim)/config/waypoints.yaml"/>

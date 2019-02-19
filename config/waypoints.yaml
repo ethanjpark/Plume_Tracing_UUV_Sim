@@ -1,3 +1,7 @@
+# Modified copy of "example_waypoints.yaml"
+# in package "uuv_control_util"
+# full filepath: uuv_simulator/uuv_control/uuv_control_utils/config/example_waypoints.yaml
+
 inertial_frame_id: world
 waypoints:
   -
