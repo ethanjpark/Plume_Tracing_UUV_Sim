@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# Modified copy of "set_demo_turbulent_plume" in package "uuv_plume_simulator"
+# Full filepath: catkin_ws/src/uuv_plume_simulator/uuv_plume_simulator/scripts/set_demo_turbulent_plume
+
 rosservice call /plume/create_passive_scalar_turbulent_plume "turbulent_diffusion_coefficients: {x: 0.05, y: 0.05, z: 0.05}
 source: {x: -0.0, y: 0.0, z: -40.0}
 buoyancy_flux: 0.05

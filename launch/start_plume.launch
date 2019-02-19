@@ -1,3 +1,8 @@
+<!-- Parts copied from start_demo_turbulent_plume.launch
+	 in package: uuv_plume_simulator. Full filepath below:
+	 catkin_ws/src/uuv_plume_simulator/uuv_plume_simulator/launch/start_demo_turbulent_plume.launch
+-->
+
 <launch>
 
   <!-- Load turbulent plume -->
