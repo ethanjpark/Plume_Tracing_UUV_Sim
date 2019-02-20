@@ -57,135 +57,135 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        rexrov/base_link:
+        rexrov2/base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/camera_link:
+        rexrov2/camera_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/camera_link_optical:
+        rexrov2/camera_link_optical:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/cameraleft_link:
+        rexrov2/cameraleft_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/cameraleft_link_optical:
+        rexrov2/cameraleft_link_optical:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/cameraright_link:
+        rexrov2/cameraright_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/cameraright_link_optical:
+        rexrov2/cameraright_link_optical:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/dvl_link:
+        rexrov2/dvl_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/dvl_sonar0_link:
+        rexrov2/dvl_sonar0_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/dvl_sonar1_link:
+        rexrov2/dvl_sonar1_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/dvl_sonar2_link:
+        rexrov2/dvl_sonar2_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/dvl_sonar3_link:
+        rexrov2/dvl_sonar3_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/gps_link:
+        rexrov2/gps_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        rexrov/imu_link:
+        rexrov2/imu_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        rexrov/magnetometer_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rexrov/pose_sensor_link_default:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        rexrov/pressure_link:
+        rexrov2/magnetometer_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/rpt_link:
+        rexrov2/pose_sensor_link_default:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rexrov2/pressure_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/thruster_0:
+        rexrov2/rpt_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/thruster_1:
+        rexrov2/thruster_0:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/thruster_2:
+        rexrov2/thruster_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/thruster_3:
+        rexrov2/thruster_2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/thruster_4:
+        rexrov2/thruster_3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/thruster_5:
+        rexrov2/thruster_4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/thruster_6:
+        rexrov2/thruster_5:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rexrov/thruster_7:
+        rexrov2/thruster_6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/thruster_7:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
       Name: RobotModel
-      Robot Description: /rexrov/robot_description
+      Robot Description: /rexrov2/robot_description
       TF Prefix: ""
       Update Interval: 0
       Value: true
@@ -221,12 +221,12 @@ Visualization Manager:
         Shaft Length: 1
         Shaft Radius: 0.05000000074505806
         Value: Arrow
-      Topic: /rexrov/pose_gt
+      Topic: /rexrov2/pose_gt
       Unreliable: false
       Value: false
     - Class: rviz/Marker
       Enabled: false
-      Marker Topic: /rexrov2current_velocity_marker
+      Marker Topic: /rexrov2/current_velocity_marker
       Name: Current Velocity Marker
       Namespaces:
         {}
@@ -260,12 +260,12 @@ Visualization Manager:
       Radius: 0.029999999329447746
       Shaft Diameter: 0.10000000149011612
       Shaft Length: 0.10000000149011612
-      Topic: /rexrov/trajectory_marker
+      Topic: /rexrov2/trajectory_marker
       Unreliable: false
       Value: true
     - Class: rviz/MarkerArray
       Enabled: true
-      Marker Topic: /rexrov/waypoint_markers
+      Marker Topic: /rexrov2/waypoint_markers
       Name: Waypoints
       Namespaces:
         "": true
@@ -291,7 +291,7 @@ Visualization Manager:
       Radius: 0.029999999329447746
       Shaft Diameter: 0.10000000149011612
       Shaft Length: 0.10000000149011612
-      Topic: /rexrov/waypoint_path_marker
+      Topic: /rexrov2/waypoint_path_marker
       Unreliable: false
       Value: true
     - Class: rviz/MarkerArray
@@ -374,7 +374,7 @@ Visualization Manager:
       Name: Current View
       Near Clip Distance: 0.009999999776482582
       Pitch: 0.1303979456424713
-      Target Frame: rexrov/base_link
+      Target Frame: rexrov2/base_link
       Value: Orbit (rviz)
       Yaw: 4.828576564788818
     Saved: ~

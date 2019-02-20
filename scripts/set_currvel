@@ -4,4 +4,4 @@
 # Full filepath: catkin_ws/src/uuv_plume_simulator/uuv_plume_simulator/scripts/set_demo_current_vel
 
 rosservice call /current_velocity_server/set_current_velocity_model "{mean: 0.4, min: 0.3, max: 0.5, noise: 0.002, mu: 0.01}"
-rosservice call /current_velocity_server/set_angle_model "{mean: 0.05, min: 0.0, max: 0.1, noise: 0.02, mu: 0.1}"
+rosservice call /current_velocity_server/set_angle_model "{mean: 0.01, min: 0.0, max: 0.1, noise: 0.02, mu: 0.1}"

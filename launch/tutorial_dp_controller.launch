@@ -1,3 +1,5 @@
+<!-- Modified to work with RexRov2-->
+
 <launch>
   <arg name="uuv_name"/>
   <arg name="model_name" default="$(arg uuv_name)"/>
