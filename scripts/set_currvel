@@ -3,5 +3,8 @@
 # Modified copy of "set_demo_current_vel" in package "uuv_plume_simulator"
 # Full filepath: catkin_ws/src/uuv_plume_simulator/uuv_plume_simulator/scripts/set_demo_current_vel
 
-rosservice call /current_velocity_server/set_current_velocity_model "{mean: 0.4, min: 0.3, max: 0.5, noise: 0.002, mu: 0.01}"
-rosservice call /current_velocity_server/set_angle_model "{mean: 0.01, min: 0.0, max: 0.1, noise: 0.02, mu: 0.1}"
+# rosservice call /current_velocity_server/set_current_velocity_model "{mean: 1.0, min: 0.5, max: 1.5, noise: 0.002, mu: 0.01}"
+# rosservice call /current_velocity_server/set_angle_model "{mean: 0.01, min: 0.0, max: 0.1, noise: 0.02, mu: 0.1}"
+
+#quasi-constant current call
+rosservice call /current_velocity/server/set_current_velocity "{velocity: 1.0, horizontal_angle: 0.0}"
