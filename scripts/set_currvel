@@ -7,4 +7,4 @@
 # rosservice call /current_velocity_server/set_angle_model "{mean: 0.01, min: 0.0, max: 0.1, noise: 0.02, mu: 0.1}"
 
 #quasi-constant current call
-rosservice call /current_velocity/server/set_current_velocity "{velocity: 1.0, horizontal_angle: 0.0}"
+rosservice call /current_velocity_server/set_current_velocity "{velocity: 1.0, horizontal_angle: 0.0}"
