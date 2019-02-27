@@ -11,8 +11,11 @@
 import rospy
 import numpy as np
 
+from std_msgs.msg import Header
+from uuv_control_msgs.msg import Waypoint
+from uuv_control_msgs.srv import GoTo
 from uuv_sensor_ros_plugins_msgs.msg import ChemicalParticleConcentration
-from geometry_msgs.msg import Vector3, Twist, TwistWithCovariance
+from geometry_msgs.msg import Vector3, Twist, TwistWithCovariance, Point
 from nav_msgs.msg import Odometry
 
 THRESHOLD = 0.1 #particle concentration threshold for detecting plume
@@ -21,6 +24,7 @@ BETA_OFFSET = 20 #angle offset relative to upflow
 UPFLOW = np.array([-1.0, 0.0]) #180 rotation of CURRENT_FLOW
 LAMBDA = 500000000 #plume detection time threshold (0.5 seconds)
 
+alg_state = -1			#global var for which state the algorithm is currently in
 particle_concentration 	#global var for particle concentration
 auv_location 			#global var for robot position
 auv_heading 			#global var for robot heading vector
@@ -37,8 +41,8 @@ def angle_between(v1,v2):
 
 #Track In behavior of algorithm
 def track_in():
-	global lhs, t_last
-	if(particle_concentration >= THRESHOLD):
+	global lhs, t_last, ldp
+	if(particle_concentration >= THRESHOLD): #stay in track-in
 		#calculate lhs var using angle between upflow and auv_heading
 		ang = angle_between(UPFLOW,auv_heading)
 		if(ang > 0): #heading is counter-clockwise from upflow
@@ -52,7 +56,40 @@ def track_in():
 
 		#update last detection point
 		ldp = auv_location
-		
+
+		#calculate heading and new waypoint
+		offsetrad = lhs*np.deg2rad(BETA_OFFSET)
+		rotmatrix = np.array([[np.cos(offsetrad), -np.sin(offsetrad)],[np.sin(offsetrad), np.cos(offsetrad)]])
+		new_heading = np.dot(UPFLOW,rotmatrix) #2D heading
+		3D_heading = np.array([new_heading[0],new_heading[1],0.0])
+		new_waypoint = np.add(3D_heading,auv_location)
+
+		#creating the waypoint message
+		head = Header()
+		head.stamp = rospy.Time.now()
+		head.frame_id = "world"
+		pt = Point
+		pt.x = new_waypoint[0]
+		pt.y = new_waypoint[1]
+		pt.z = new_waypoint[2]
+		wp = Waypoint()
+		wp.header = head
+		wp.point = pt
+		wp.max_forward_speed = 0.4
+		wp.heading_offset = 0.0
+		wp.use_fixed_heading = False
+		wp.radius_of_acceptance = 0.0
+
+		#rosservice call to Go_To
+		rospy.wait_for_service('go_to')
+		try:
+			goto = rospy.ServiceProxy('go_to', GoTo)
+			res = goto(wp,0.4,)
+
+
+	elif(rospy.get_rostime() - t_last > LAMBDA): #go to track-out
+		lost_pnts.append(ldp)
+		alg_state = 3
 
 #callback function for particle concentration subscriber
 def readconcentration(msg):
