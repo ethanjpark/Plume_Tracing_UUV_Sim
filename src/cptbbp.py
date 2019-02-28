@@ -10,12 +10,11 @@
 
 import rospy
 import numpy as np
+import uuv_waypoints
 
-from std_msgs.msg import Header
-from uuv_control_msgs.msg import Waypoint
 from uuv_control_msgs.srv import GoTo
 from uuv_sensor_ros_plugins_msgs.msg import ChemicalParticleConcentration
-from geometry_msgs.msg import Vector3, Twist, TwistWithCovariance, Point
+from geometry_msgs.msg import Vector3, Twist, TwistWithCovariance
 from nav_msgs.msg import Odometry
 
 THRESHOLD = 0.1 #particle concentration threshold for detecting plume
@@ -40,7 +39,7 @@ def angle_between(v1,v2):
     return np.rad2deg(rad2-rad1)
 
 #Track In behavior of algorithm
-def track_in():
+def track_in(gotoservice):
 	global lhs, t_last, ldp
 	if(particle_concentration >= THRESHOLD): #stay in track-in
 		#calculate lhs var using angle between upflow and auv_heading
@@ -65,27 +64,21 @@ def track_in():
 		new_waypoint = np.add(3D_heading,auv_location)
 
 		#creating the waypoint message
-		head = Header()
-		head.stamp = rospy.Time.now()
-		head.frame_id = "world"
-		pt = Point
-		pt.x = new_waypoint[0]
-		pt.y = new_waypoint[1]
-		pt.z = new_waypoint[2]
-		wp = Waypoint()
-		wp.header = head
-		wp.point = pt
-		wp.max_forward_speed = 0.4
-		wp.heading_offset = 0.0
-		wp.use_fixed_heading = False
-		wp.radius_of_acceptance = 0.0
+		wp = uuv_waypoints.Waypoint(
+			x=new_waypoint[0],
+			y=new_waypoint[1],
+			z=new_waypoint[2],
+			max_forward_speed=0.4,
+			heading_offset=0.0,
+			use_fixed_heading=False,
+			inertial_frame_id="world")
 
 		#rosservice call to Go_To
 		rospy.wait_for_service('go_to')
 		try:
-			goto = rospy.ServiceProxy('go_to', GoTo)
-			res = goto(wp,0.4,)
-
+			interpolator = rospy.get_param('~interpolator', 'lipb')
+			res = gotoservice(wp,wp.max_forward_speed,String(interpolator))
+			print("Go To service call successful: " + String(res))
 
 	elif(rospy.get_rostime() - t_last > LAMBDA): #go to track-out
 		lost_pnts.append(ldp)
@@ -94,7 +87,6 @@ def track_in():
 #callback function for particle concentration subscriber
 def readconcentration(msg):
 	global particle_concentration, auv_location
-
 	particle_concentration = msg.concentration
 	auv_location = np.array([msg.position.x, msg.position.y, msg.position.z])
 
@@ -102,11 +94,10 @@ def readconcentration(msg):
 #callback function for auv pose subscriber
 def readauvpose(msg):
 	global auv_heading
-
 	auv_heading = np.array([msg.twist.twist.linear.x, msg.twist.twist.linear.y])
 
 
-def main():
+if __name__=='__main__':
 	rospy.init_node('CPT_BBP')
 
 	part_conc_sub = rospy.Subscriber(
@@ -119,8 +110,22 @@ def main():
 		Odometry,
 		readauvpose)
 
-	rospy.spin()
+	goto = rospy.ServiceProxy('go_to', GoTo)
 
-
-if __name__=='__main__':
-	main()
+	while(not rospy.is_shutdown()):
+		#since finding is not implemented yet, go to fixed point where plume will be
+		
+		iwp = uuv_waypoints.Waypoint(
+			x=5,
+			y=0,
+			z=-23,
+			max_forward_speed=0.4,
+			heading_offset=0.0,
+			use_fixed_heading=False,
+			inertial_frame_id="world")
+		#rosservice call to Go_To
+		rospy.wait_for_service('go_to')
+		try:
+			interpolator = rospy.get_param('~interpolator', 'lipb')
+			res = goto(iwp,iwp.max_forward_speed,String(interpolator))
+			print("Initial Go To service call successful: " + String(res))
