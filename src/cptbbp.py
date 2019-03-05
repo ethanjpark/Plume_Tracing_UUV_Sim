@@ -18,13 +18,14 @@ from uuv_sensor_ros_plugins_msgs.msg import ChemicalParticleConcentration
 from geometry_msgs.msg import Point, Vector3, Twist, TwistWithCovariance
 from nav_msgs.msg import Odometry
 
-THRESHOLD = 0.1 #particle concentration threshold for detecting plume
+THRESHOLD = 0.005 					#particle concentration threshold for detecting plume
 CURRENT_FLOW = np.array([1.0, 0.0]) # [x,y] vector of the current flow
-BETA_OFFSET = 20 #angle offset relative to upflow
-UPFLOW = np.array([-1.0, 0.0]) #180 rotation of CURRENT_FLOW
-LAMBDA = 500000000 #plume detection time threshold (0.5 seconds)
+BETA_OFFSET = 20 					#angle offset relative to upflow
+UPFLOW = np.array([-1.0, 0.0]) 		#180 rotation of CURRENT_FLOW
+LAMBDA = 500000000 					#plume detection time threshold (0.5 seconds)
 
-alg_state = -1                  #global var for which state the algorithm is currently in
+alg_state = 0                   #global var for which state the algorithm is currently in
+								#0 for init, 1 for find, 2 for track-in, 3 for track-out, 4 for reacquire, 5 (maybe) for source declared
 particle_concentration = 0.0    #global var for particle concentration
 auv_location = None             #global var for robot position
 auv_heading = None              #global var for robot heading vector
@@ -40,9 +41,11 @@ def angle_between(v1,v2):
 	return np.rad2deg(rad2-rad1)
 
 #Track In behavior of algorithm
-def track_in(gotoservice):
+def track_in(gotoservice,interpolator):
 	global lhs, t_last, ldp
+
 	if(particle_concentration >= THRESHOLD): #stay in track-in
+		alg_state = 2
 		#calculate lhs var using angle between upflow and auv_heading
 		ang = angle_between(UPFLOW,auv_heading)
 		if(ang > 0): #heading is counter-clockwise from upflow
@@ -61,28 +64,30 @@ def track_in(gotoservice):
 		offsetrad = lhs*np.deg2rad(BETA_OFFSET)
 		rotmatrix = np.array([[np.cos(offsetrad), -np.sin(offsetrad)],[np.sin(offsetrad), np.cos(offsetrad)]])
 		new_heading = np.dot(UPFLOW,rotmatrix) #2D heading
+		new_heading = new_heading/np.linalg.norm(new_heading)
+		print("Calculated heading: " + str(new_heading[0]) + "," + str(new_heading[1]))
 		threed_heading = np.array([new_heading[0],new_heading[1],0.0])
 		new_waypoint = np.add(threed_heading,auv_location)
-
-		#creating the waypoint message
-		wp = uuv_waypoints.Waypoint(
-			x=new_waypoint[0],
-			y=new_waypoint[1],
-			z=new_waypoint[2],
-			max_forward_speed=0.4,
-			heading_offset=0.0,
-			use_fixed_heading=False,
-			inertial_frame_id="world")
+		
+		#create waypoint message
+		wp = Waypoint()
+		wp.header.stamp = rospy.Time.now()
+		wp.header.frame_id = "world"
+		wp.point.x = new_waypoint[0]
+		wp.point.y = new_waypoint[1]
+		wp.point.z = new_waypoint[2]
+		wp.max_forward_speed = 0.4
+		wp.heading_offset = 0.0
+		wp.use_fixed_heading = False
 
 		#rosservice call to Go_To
-		rospy.wait_for_service('go_to')
 		try:
-			interpolator = rospy.get_param('~interpolator', 'lipb')
-			res = gotoservice(wp,wp.max_forward_speed,String(interpolator))
-			print("Go To service call successful: " + String(res))
+			res = gotoservice(wp,wp.max_forward_speed,str(interpolator))
+			print("Go To service call successful: " + str(res))
 		except rospy.ServiceException, e:
 			print("Service call failed: %s"%e)
-	elif(rospy.get_rostime() - t_last > LAMBDA): #go to track-out
+
+	elif(rospy.get_rostime().nsecs - t_last > LAMBDA): #go to track-out
 		lost_pnts.append(ldp)
 		alg_state = 3
 
@@ -113,29 +118,37 @@ if __name__=='__main__':
 		readauvpose)
 
 	interpolator = rospy.get_param('~interpolator', 'lipb')
-	print("waiting for go to service!")
+	
 	try:
 		rospy.wait_for_service('rexrov2/go_to', timeout=15)
 	except rospy.ROSException:
 		raise rospy.ROSException('Service not available!')
-	print("creating serviceproxy instance for goto!")
+	
 	try:
 		goto = rospy.ServiceProxy('rexrov2/go_to', GoTo)
 	except rospy.ROSException as e:
-		raise rospy.ROSException('Service call failed, error=%s', str(e))
+		raise rospy.ROSException('Service proxy failed, error=%s', str(e))
 
-	iwp = Waypoint()
-	iwp.header.stamp = rospy.Time.now()
-	iwp.header.frame_id = "world"
-	iwp.point.x = 5
-	iwp.point.y = 0
-	iwp.point.z = -24
-	iwp.max_forward_speed = 0.4
-	iwp.heading_offset = 0.0
-	iwp.use_fixed_heading = False
+	while not rospy.is_shutdown():
+		#running the algorithm to quickly makes for some... interesting AUV behavior
+		r = rospy.Rate(1)
+		r.sleep()
+		if(particle_concentration > 0):
+			print("Particle concentration = " + str(particle_concentration))
+		print("AUV heading: " + str(auv_heading[0]) + "," + str(auv_heading[1]))
+		#check algorithm state and run appropriate behavior
+		#for now, checking track-in behavior
+		track_in(goto,interpolator)
 
-	res = goto(iwp,iwp.max_forward_speed, str(interpolator))
-	print("Initial Go To service call successful: " + str(res))
+	# iwp = Waypoint()
+	# iwp.header.stamp = rospy.Time.now()
+	# iwp.header.frame_id = "world"
+	# iwp.point.x = 5
+	# iwp.point.y = 0
+	# iwp.point.z = -24
+	# iwp.max_forward_speed = 0.4
+	# iwp.heading_offset = 0.0
+	# iwp.use_fixed_heading = False
 
-	# while(not rospy.is_shutdown()):
-		#since finding is not implemented yet, go to fixed point where plume will be
+	# res = goto(iwp,iwp.max_forward_speed, str(interpolator))
+	# print("Initial Go To service call successful: " + str(res))
