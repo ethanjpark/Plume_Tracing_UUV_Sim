@@ -24,7 +24,7 @@ CURRENT_FLOW = np.array([1.0, 0.0]) #[x,y] vector of the current flow
 BETA_OFFSET = 20 					#angle offset relative to upflow
 UPFLOW = np.array([-1.0, 0.0]) 		#180 rotation of CURRENT_FLOW
 LAMBDA = 2000000000 				#plume detection time threshold (2 seconds)
-R = 0.25							#distance threshold to find new ldp waypoint
+R = 0.1								#distance threshold to find new ldp waypoint
 L_u = 0.5							#constant for how much upflow from last detected location auv should go
 L_c = 0.2							#constant for how much cross flow from last detected location auv should go
 
@@ -39,12 +39,47 @@ t_last = 0                  	#global var for last time at which plume was detect
 lost_pnts = []          		#last detection points stored when track out is triggered
 ldp = None                     	#global var for last detection point
 tout_init = 0					#global var indicating whether track-out needs to choose the next upflow last detected point
+bowtie_step = -1				#global var for which step of the bowtie maneuver auv is currently performing
+								# 0 = going to center, 1 for upflow left, 2 for downflow left, 3 for upflow right, 4 for downflow right 
 
 #Calculate angle between two vectors (counter-clockwise positive)
 def angle_between(v1,v2):
 	rad1 = np.arctan2(v1[1],v1[0]) #arctan2 args are y,x (weird)
 	rad2 = np.arctan2(v2[1],v2[0])
 	return np.rad2deg(rad2-rad1)
+
+#Calculate normalized rotated vector of upflow
+def rotate_upflow(angle):
+	rotmatrix = np.array([[np.cos(angle), -np.sin(angle)],[np.sin(angle), np.cos(angle)]])
+	new_heading = np.dot(UPFLOW,rotmatrix) #2D heading
+	new_heading = new_heading/np.linalg.norm(new_heading)
+	return new_heading
+
+#Waypoint messsage 'constructor'
+def make_waypoint(newx,newy,newz):
+	#create waypoint message
+	wp = Waypoint()
+	wp.header.stamp = rospy.Time.now()
+	wp.header.frame_id = "world"
+	wp.point.x = newx
+	wp.point.y = newy
+	wp.point.z = newz
+	wp.max_forward_speed = 0.4
+	wp.heading_offset = 0.0
+	wp.use_fixed_heading = False
+
+#Go To service call
+def call_goto(wp, gotoservice, interpolator):
+	#rosservice call to Go_To
+	try:
+		res = gotoservice(wp,wp.max_forward_speed,str(interpolator))
+		print("Go To service call successful: " + str(res))
+	except rospy.ServiceException, e:
+		print("Service call failed: %s"%e)
+
+#Check distance between two locations
+def has_reached(a, b, thres):
+	return (np.linalg.norm(a-b) < thres)
 
 #Track In behavior of algorithm
 def track_in(gotoservice,interpolator):
@@ -68,34 +103,17 @@ def track_in(gotoservice,interpolator):
 
 		#calculate heading and new waypoint
 		offsetrad = lhs*np.deg2rad(BETA_OFFSET)
-		rotmatrix = np.array([[np.cos(offsetrad), -np.sin(offsetrad)],[np.sin(offsetrad), np.cos(offsetrad)]])
-		new_heading = np.dot(UPFLOW,rotmatrix) #2D heading
-		new_heading = new_heading/np.linalg.norm(new_heading)
-		print("Calculated heading: " + str(new_heading[0]) + "," + str(new_heading[1]))
+		new_heading = rotate_upflow(offsetrad)
 		threed_heading = np.array([new_heading[0],new_heading[1],0.0])
 		new_waypoint = np.add(threed_heading,auv_location)
 		
-		#create waypoint message
-		wp = Waypoint()
-		wp.header.stamp = rospy.Time.now()
-		wp.header.frame_id = "world"
-		wp.point.x = new_waypoint[0]
-		wp.point.y = new_waypoint[1]
-		wp.point.z = new_waypoint[2]
-		wp.max_forward_speed = 0.4
-		wp.heading_offset = 0.0
-		wp.use_fixed_heading = False
-
-		#rosservice call to Go_To
-		try:
-			res = gotoservice(wp,wp.max_forward_speed,str(interpolator))
-			print("Go To service call successful: " + str(res))
-		except rospy.ServiceException, e:
-			print("Service call failed: %s"%e)
+		wp = make_waypoint(new_waypoint[0], new_waypoint[1], new_waypoint[2])
+		call_goto(wp, gotoservice, interpolator)
 
 	#lost contact with plume
 	elif(rospy.get_rostime().nsecs - t_last > LAMBDA): #go to track-out
 		lost_pnts.append(ldp)
+		print("Lost contact with plume, going to track-out.")
 		alg_state = 3
 
 #Track out behavior of algorithm
@@ -109,6 +127,7 @@ def track_out(gotoservice,interpolator):
 		if(S):
 			alg_state = 5 #source has been found
 		else:
+			print("Plume found, going to track-in.")
 			alg_state = 2 #back to track in
 
 	else:
@@ -117,40 +136,25 @@ def track_out(gotoservice,interpolator):
 			up = np.array([lost_pnts[-1][0], lost_pnts[-1][1]]) #set to most upflow point in last detection point list
 			tout_init = 0
 			#set destination to a point that is upflow and cross the flow from last detected point
-			rotmatrix = np.array([[np.cos(np.pi/2), -np.sin(np.pi/2)],[np.sin(np.pi/2), np.cos(np.pi/2)]])
-			f_p = np.dot(UPFLOW,rotmatrix) #2D heading
-			f_p = f_p/np.linalg.norm(f_p)
+			f_p = rotate_upflow(np.pi/2)
 			f = UPFLOW/np.linalg.norm(UPFLOW)
 			new_waypoint = up - np.dot(L_u,f) - np.dot(L_c*lhs,f_p)
 
 		#has gotten close enough to designated ldp waypoint
-		if(np.linalg.norm(auv_location - new_waypoint) < R):
+		if(has_reached(auv_location, new_waypoint, R)):
 			tout_init = 1
 			S = src_check()
 			if(S):
 				alg_state = 5 #source has been found
 			else:
+				print("Going to reacquire.")
 				alg_state = 4 #go to reacquire
 
 		#go to ldp waypoint
 		else:
-			#create waypoint message
-			wp = Waypoint()
-			wp.header.stamp = rospy.Time.now()
-			wp.header.frame_id = "world"
-			wp.point.x = new_waypoint[0]
-			wp.point.y = new_waypoint[1]
-			wp.point.z = lost_pnts[-1][2] #we're only concerned with 2D plume tracing
-			wp.max_forward_speed = 0.4
-			wp.heading_offset = 0.0
-			wp.use_fixed_heading = False
-
-			#rosservice call to Go_To
-			try:
-				res = gotoservice(wp,wp.max_forward_speed,str(interpolator))
-				print("Go To service call successful: " + str(res))
-			except rospy.ServiceException, e:
-				print("Service call failed: %s"%e)
+			wp = make_waypoint(new_waypoint[0], new_waypoint[1], lost_pnts[-1][2])
+			print("Going somewhere based on ldp.")
+			call_goto(wp, gotoservice, interpolator)
 
 #function for checking whether source can be determined from ldp list
 def src_check():
@@ -174,6 +178,67 @@ def src_check():
 		else:
 			print("Data inconclusive, source cannot be determined with accuracy.")
 			return False
+
+#Reacquire behavior of algorithm
+def reacquire(gotoservice, interpolator):
+	if(particle_concentration >= THRESHOLD):
+		print("Plume found, going to track-in.")
+		bowtie_step = -1
+		alg_state = 2
+	else:
+		#calculate vertices of bowtie maneuver
+		bowtie_center = lost_pnts[-1] #most upflow ldp is center of bowtie maneuver
+		angle1 = np.deg2rad(15)
+		angle2 = np.deg2rad(165)
+		angle3 = np.deg2rad(-15)
+		angle4 = np.deg2rad(-165)
+		uleft = 2*rotate_upflow(angle1) #multiplied by 2 for a bigger maneuver since output of rotate_upflow is normalized
+		dleft = 2*rotate_upflow(angle2)
+		uright = 2*rotate_upflow(angle3)
+		dright = 2*rotate_upflow(angle4)
+		bowtie_uleft = np.array([auv_location[0]+uleft[0], auv_location[1]+uleft[1], auv_location[2]])
+		bowtie_dleft = np.array([auv_location[0]+dleft[0], auv_location[1]+dleft[1], auv_location[2]])
+		bowtie_uright = np.array([auv_location[0]+uright[0], auv_location[1]+uright[1], auv_location[2]])
+		bowtie_dright = np.array([auv_location[0]+dright[0], auv_location[1]+dright[1], auv_location[2]])
+
+		if(bowtie_step == -1):	#go to center of bowtie
+			bowtie_step = 0
+			wp = make_waypoint(bowtie_center[0], bowtie_center[1], bowtie_center[2])
+			print("Going to center of bowtie.")
+			call_goto(wp, gotoservice, interpolator)
+		elif(bowtie_step == 0):	#check if center reached, if so then start bowtie
+			if(has_reached(auv_location, bowtie_center, R)):
+				bowtie_step = 1
+				wp = make_waypoint(bowtie_uleft[0], bowtie_uleft[1], bowtie_uleft[2])
+				print("Going to upper left of bowtie.")
+				call_goto(wp, gotoservice, interpolator)
+		elif(bowtie_step == 1):
+			if(has_reached(auv_location, bowtie_uleft, R)):
+				bowtie_step = 2
+				wp = make_waypoint(bowtie_dleft[0], bowtie_dleft[1], bowtie_dleft[2])
+				print("Going to lower left of bowtie.")
+				call_goto(wp, gotoservice, interpolator)
+		elif(bowtie_step == 2):
+			if(has_reached(auv_location, bowtie_dleft, R)):
+				bowtie_step = 3
+				wp = make_waypoint(bowtie_uright[0], bowtie_uright[1], bowtie_uright[2])
+				print("Going to upper right of bowtie.")
+				call_goto(wp, gotoservice, interpolator)
+		elif(bowtie_step == 3):
+			if(has_reached(auv_location, bowtie_uright, R)):
+				bowtie_step = 4
+				wp = make_waypoint(bowtie_dright[0], bowtie_dright[1], bowtie_dright[2])
+				print("Going to lower right of bowtie.")
+				call_goto(wp, gotoservice, interpolator)
+		elif(bowtie_step == 4):
+			if(has_reached(auv_location, bowtie_dright, R)): #end of bowtie maneuver reached without finding plume
+				lost_pnts = lost_pnts[:-1]	#remove most upflow point and start again
+				if(len(lost_pnts) == 0): #no more ldp points to go through
+					print("Couldn't find plume after bowtie, going to find.")
+					alg_state = 1 #go back to find behavior
+				else:
+					bowtie_step = -1
+
 
 #callback function for particle concentration subscriber
 def readconcentration(msg):
@@ -217,22 +282,13 @@ if __name__=='__main__':
 		#running the algorithm to quickly makes for some... interesting AUV behavior (namely breakdancing)
 		r = rospy.Rate(1)
 		r.sleep()
-		if(particle_concentration > 0):
-			print("Particle concentration = " + str(particle_concentration))
-		print("AUV heading: " + str(auv_heading[0]) + "," + str(auv_heading[1]))
+		print("Algorithm state: " + str(alg_state))
+		# if(particle_concentration > 0):
+		# 	print("Particle concentration = " + str(particle_concentration))
+		# print("AUV heading: " + str(auv_heading[0]) + "," + str(auv_heading[1]))
 		#check algorithm state and run appropriate behavior
 		#for now, checking track-in behavior
 		track_in(goto,interpolator)
-
-	# iwp = Waypoint()
-	# iwp.header.stamp = rospy.Time.now()
-	# iwp.header.frame_id = "world"
-	# iwp.point.x = 5
-	# iwp.point.y = 0
-	# iwp.point.z = -24
-	# iwp.max_forward_speed = 0.4
-	# iwp.heading_offset = 0.0
-	# iwp.use_fixed_heading = False
 
 	# res = goto(iwp,iwp.max_forward_speed, str(interpolator))
 	# print("Initial Go To service call successful: " + str(res))
