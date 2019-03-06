@@ -23,11 +23,11 @@ THRESHOLD = 0.004 					#particle concentration threshold for detecting plume
 CURRENT_FLOW = np.array([1.0, 0.0]) #[x,y] vector of the current flow
 BETA_OFFSET = 20 					#angle offset relative to upflow
 UPFLOW = np.array([-1.0, 0.0]) 		#180 rotation of CURRENT_FLOW
-LAMBDA = 2000000000 				#plume detection time threshold (2 seconds)
+LAMBDA = 2.0 						#plume detection time threshold (2 seconds)
 R = 0.1								#distance threshold to find new ldp waypoint
 L_u = 0.5							#constant for how much upflow from last detected location auv should go
 L_c = 0.2							#constant for how much cross flow from last detected location auv should go
-startx = 25							#x-component of where auv should start from
+startx = 20							#x-component of where auv should start from
 starty = 25							#y-component of where auv should start from
 
 #Global Vars
@@ -40,13 +40,15 @@ lhs = 0                     	#global var for which side of plume robot will driv
 t_last = 0                  	#global var for last time at which plume was detected
 lost_pnts = []          		#last detection points stored when track out is triggered
 ldp = None                     	#global var for last detection point
-tout_init = 0					#global var indicating whether track-out needs to choose the next upflow last detected point
+tout_init = 1					#global var indicating whether track-out needs to choose the next upflow last detected point
+tout_wp = None					#global var for storing waypoint for track-out behavior
 bowtie_step = -1				#global var for which step of the bowtie maneuver auv is currently performing
 								# 0 = going to center, 1 for upflow left, 2 for downflow left, 3 for upflow right, 4 for downflow right
 upnotcross = 0					#global var indicator for when auv is going upflow not cross (for hitting boundary)
 findpos = 1						#global var for indicating which direction of rotation from upflow auv is going
 findbound = 0					#global var indicating which boundary (pos/neg x or pos/neg y) the auv hit
 								# 1 for pos x, 2 for neg x, 3 for pos y, 4 for neg y
+prevfindbound = 0				#global var to keep track of which edge we hit last
 
 #dictionary for mapping alg_state to behaviors
 s2b = {
@@ -81,7 +83,7 @@ def make_waypoint(newx,newy,newz):
 	wp.point.x = newx
 	wp.point.y = newy
 	wp.point.z = newz
-	wp.max_forward_speed = 0.4
+	wp.max_forward_speed = 0.75
 	wp.heading_offset = 0.0
 	wp.use_fixed_heading = False
 	return wp
@@ -91,7 +93,7 @@ def call_goto(wp, gotoservice, interpolator):
 	#rosservice call to Go_To
 	try:
 		res = gotoservice(wp,wp.max_forward_speed,str(interpolator))
-		print("Go To service call successful: " + str(res))
+		#print("Go To service call successful: " + str(res))
 	except rospy.ServiceException, e:
 		print("Service call failed: %s"%e)
 
@@ -101,6 +103,8 @@ def has_reached(a, b, thres):
 
 #Check auv location for boundaries
 def check_bounds(location):
+	global findbound
+
 	if(location[0] > 40):
 		findbound = 1
 		return False
@@ -132,8 +136,7 @@ def track_in(gotoservice,interpolator):
 			lhs = -1
 
 		#update t_last
-		now = rospy.get_rostime()
-		t_last = now.nsecs
+		t_last = rospy.get_time()
 
 		#update last detection point
 		ldp = auv_location
@@ -148,14 +151,14 @@ def track_in(gotoservice,interpolator):
 		call_goto(wp, gotoservice, interpolator)
 
 	#lost contact with plume
-	elif(rospy.get_rostime().nsecs - t_last > LAMBDA): #go to track-out
+	elif(rospy.get_time() - t_last > LAMBDA): #go to track-out
 		lost_pnts.append(ldp)
 		print("Lost contact with plume, going to track-out.")
 		alg_state = 3
 
 #Track out behavior of algorithm
 def track_out(gotoservice,interpolator):
-	global tout_init, alg_state
+	global tout_init, alg_state, tout_wp
 
 	#plume detected again
 	if(particle_concentration >= THRESHOLD):
@@ -168,17 +171,16 @@ def track_out(gotoservice,interpolator):
 			alg_state = 2 #back to track in
 
 	else:
-		new_waypoint = None
 		if(tout_init == 1): #determine destination waypoint
 			up = np.array([lost_pnts[-1][0], lost_pnts[-1][1]]) #set to most upflow point in last detection point list
 			tout_init = 0
 			#set destination to a point that is upflow and cross the flow from last detected point
 			f_p = rotate_upflow(np.pi/2)
 			f = UPFLOW/np.linalg.norm(UPFLOW)
-			new_waypoint = up - np.dot(L_u,f) - np.dot(L_c*lhs,f_p)
+			tout_wp = up - np.dot(L_u,f) - np.dot(L_c*lhs,f_p)
 
 		#has gotten close enough to designated ldp waypoint
-		if(has_reached(auv_location, new_waypoint, R)):
+		if(has_reached(auv_location, np.array([tout_wp[0], tout_wp[1], auv_location[2]]), R)):
 			tout_init = 1
 			S = src_check()
 			if(S):
@@ -186,10 +188,9 @@ def track_out(gotoservice,interpolator):
 			else:
 				print("Going to reacquire.")
 				alg_state = 4 #go to reacquire
-
 		#go to ldp waypoint
 		else:
-			wp = make_waypoint(new_waypoint[0], new_waypoint[1], lost_pnts[-1][2])
+			wp = make_waypoint(tout_wp[0], tout_wp[1], lost_pnts[-1][2])
 			print("Going somewhere based on ldp.")
 			call_goto(wp, gotoservice, interpolator)
 
@@ -199,9 +200,9 @@ def src_check():
 		print("Not enough data to determine source.")
 		return False
 	else:
-		v1 = np.array(lost_pnts[-3][0]-lost_pnts[-1][0], lost_pnts[-3][1]-lost_pnts[-1][1]) #vector from 3rd to 1st point (in terms of how upflow)
-		v2 = np.array(lost_pnts[-2][0]-lost_pnts[-1][0], lost_pnts[-2][1]-lost_pnts[-1][1])	#vector from 2nd to 1st point (in terms of how upflow)
-		v3 = np.array(lost_pnts[-3][0]-lost_pnts[-2][0], lost_pnts[-3][1]-lost_pnts[-2][1]) #vector from 3rd to 2nd point (in terms of how upflow)
+		v1 = np.array([lost_pnts[-3][0]-lost_pnts[-1][0], lost_pnts[-3][1]-lost_pnts[-1][1]]) #vector from 3rd to 1st point (in terms of how upflow)
+		v2 = np.array([lost_pnts[-2][0]-lost_pnts[-1][0], lost_pnts[-2][1]-lost_pnts[-1][1]])	#vector from 2nd to 1st point (in terms of how upflow)
+		v3 = np.array([lost_pnts[-3][0]-lost_pnts[-2][0], lost_pnts[-3][1]-lost_pnts[-2][1]]) #vector from 3rd to 2nd point (in terms of how upflow)
 		#calculate scalar projection of vectors onto upflow vector
 		temp = np.linalg.norm(UPFLOW)
 		print("Calculating distances between three most upflow points in direction of upflow...")
@@ -231,10 +232,10 @@ def reacquire(gotoservice, interpolator):
 		angle2 = np.deg2rad(165)
 		angle3 = np.deg2rad(-15)
 		angle4 = np.deg2rad(-165)
-		uleft = 2*rotate_upflow(angle1) #multiplied by 2 for a bigger maneuver since output of rotate_upflow is normalized
-		dleft = 2*rotate_upflow(angle2)
-		uright = 2*rotate_upflow(angle3)
-		dright = 2*rotate_upflow(angle4)
+		uleft = 5*rotate_upflow(angle1) #multiplied by 2 for a bigger maneuver since output of rotate_upflow is normalized
+		dleft = 5*rotate_upflow(angle2)
+		uright = 5*rotate_upflow(angle3)
+		dright = 5*rotate_upflow(angle4)
 		bowtie_uleft = np.array([auv_location[0]+uleft[0], auv_location[1]+uleft[1], auv_location[2]])
 		bowtie_dleft = np.array([auv_location[0]+dleft[0], auv_location[1]+dleft[1], auv_location[2]])
 		bowtie_uright = np.array([auv_location[0]+uright[0], auv_location[1]+uright[1], auv_location[2]])
@@ -280,7 +281,7 @@ def reacquire(gotoservice, interpolator):
 
 #Find behavior in algorithm
 def find_plume(gotoservice, interpolator):
-	global alg_state, upnotcross
+	global alg_state, upnotcross, findpos, prevfindbound
 
 	if(particle_concentration >= THRESHOLD):
 		print("Plume found, going to track-in.")
@@ -288,30 +289,44 @@ def find_plume(gotoservice, interpolator):
 	else:
 		alg_state = 1
 		if(upnotcross == 1):
+			print("find: going across")
 			upnotcross = 0
 			if(findpos == 1):
 				findpos = -1
 			elif(findpos == -1):
 				findpos = 1
 			cross = rotate_upflow(findpos*np.pi/2)
+			done = False
+			while(not done):
+				cross += cross
+				if(auv_location[0]+cross[0] < -40 or auv_location[0]+cross[0] > 40 or auv_location[1]+cross[1] < -25 or auv_location[1]+cross[1] > 25):
+					done = True
 			wp = make_waypoint(auv_location[0]+cross[0], auv_location[1]+cross[1], auv_location[2])
+			call_goto(wp, gotoservice, interpolator)
 		else:
-			if(not check_bounds(auv_location)): #hit boundary, go upflow slightly before crossing
+			if(not check_bounds(auv_location) and prevfindbound != findbound): #hit boundary, go upflow slightly before crossing
+				print("find: hit boundary")
 				upnotcross = 1
 				ufnorm = UPFLOW/np.linalg.norm(UPFLOW)
 				#depending on which boundary the auv hit, have to adjust the vector so it doesn't keep going out of bounds
 				if(findbound == 1): #triggered on positive x boundary
+					prevfindbound = 1
 					if(ufnorm[0] > 0): ufnorm[0] = 0
 				elif(findbound == 2): #triggered on negative x boundary
+					prevfindbound = 2
 					if(ufnorm[0] < 0): ufnorm[0] = 0
 				elif(findbound == 3): #triggered on positive y boundary
+					prevfindbound = 3
 					if(ufnorm[1] > 0): ufnorm[1] = 0
 				elif(findbound == 4): #triggered on negative y boundary
+					prevfindbound = 4
 					if(ufnorm[1] < 0): ufnorm[1] = 0
+				print("find: going upflow")
 				wp = make_waypoint(auv_location[0]+ufnorm[0], auv_location[1]+ufnorm[1], auv_location[2])
-			else: #still within boundary, keep going
-				cross = rotate_upflow(findpos*np.pi/2)
-				wp = make_waypoint(auv_location[0]+cross[0], auv_location[1]+cross[1], auv_location[2])
+				call_goto(wp, gotoservice, interpolator)
+			# else: #still within boundary, keep going
+			# 	cross = 2*rotate_upflow(findpos*np.pi/2)
+			# 	wp = make_waypoint(auv_location[0]+cross[0], auv_location[1]+cross[1], auv_location[2])
 
 #callback function for particle concentration subscriber
 def readconcentration(msg):
@@ -351,21 +366,43 @@ if __name__=='__main__':
 	except rospy.ROSException as e:
 		raise rospy.ROSException('Service proxy failed, error=%s', str(e))
 
+	prevstate = -1
+
 	while not rospy.is_shutdown():
 		#running the algorithm to quickly makes for some... interesting AUV behavior (namely breakdancing)
 		r = rospy.Rate(1)
 		r.sleep()
-		print("Algorithm state: " + s2b[alg_state])
+
+		if(alg_state != prevstate):
+			print("Algorithm state: " + s2b[alg_state])
 		if(particle_concentration > 0):
 			print("Particle concentration = " + str(particle_concentration))
 		
 		#check algorithm state and run appropriate behavior
-		if(alg_state == -1):
+		if(alg_state == -1): #initial startup
 			alg_state = 0
+			prevstate = 0
 			wp = make_waypoint(startx, starty, auv_location[2])
 			call_goto(wp, goto, interpolator)
-		elif(alg_state == 0):
+		elif(alg_state == 0):	#go to starting pos
 			dest = np.array([startx, starty, auv_location[2]])
 			if(has_reached(auv_location, dest, R)):
-				find_plume(gotoservice, interpolator)
+				find_plume(goto, interpolator)
 		elif(alg_state == 1):
+			prevstate = 1
+			find_plume(goto, interpolator)
+		elif(alg_state == 2):
+			prevstate = 2
+			track_in(goto, interpolator)
+		elif(alg_state == 3):
+			prevstate = 3
+			track_out(goto, interpolator)
+		elif(alg_state == 4):
+			prevstate = 4
+			reacquire(goto, interpolator)
+		elif(alg_state == 5): #source found
+			prevstate = 5
+			if(not has_reached(auv_location, lost_pnts[-1], R)): #go to most upflow ldp, which is speculated source
+				print("Source: [" + str(lost_pnts[-1][0]) + ", " + str(lost_pnts[-1][1]) + ", " + str(lost_pnts[-1][2] + "]"))
+				wp = make_waypoint(lost_pnts[-1][0], lost_pnts[-1][1], lost_pnts[-1][2])
+				call_goto(wp, goto, interpolator)

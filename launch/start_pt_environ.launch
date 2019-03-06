@@ -5,8 +5,8 @@
   <include file="$(find rexrov2_description)/launch/upload_rexrov2.launch">
     <arg name="mode" value="default"/>
     <arg name="x" value="30"/>
-    <arg name="y" value="2"/>
-    <arg name="z" value="-21"/>
+    <arg name="y" value="20"/>
+    <arg name="z" value="-23"/>
     <arg name="namespace" value="rexrov2"/>
   </include>
 
