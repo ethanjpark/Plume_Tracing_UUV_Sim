@@ -33,6 +33,7 @@ lhs = 0                     	#global var for which side of plume robot will driv
 t_last = 0                  	#global var for last time at which plume was detected
 lost_pnts = []          		#last detection points stored when track out is triggered
 ldp = None                     	#global var for last detection point
+tout_init = 0					#global var indicating whether track-out needs to choose the next upflow last detected point
 
 #Calculate angle between two vectors (counter-clockwise positive)
 def angle_between(v1,v2):
@@ -87,9 +88,63 @@ def track_in(gotoservice,interpolator):
 		except rospy.ServiceException, e:
 			print("Service call failed: %s"%e)
 
+	#lost contact with plume
 	elif(rospy.get_rostime().nsecs - t_last > LAMBDA): #go to track-out
 		lost_pnts.append(ldp)
 		alg_state = 3
+
+#Track out behavior of algorithm
+def track_out(gotoservice,interpolator):
+	global tout_init, alg_state
+
+	#plume detected again
+	if(particle_concentration >= THRESHOLD):
+		tout_init = 1
+		S = src_check()
+		if(S):
+			alg_state = 5 #source has been found
+		else:
+			alg_state = 2 #back to track in
+
+	else:
+		new_waypoint = None
+		if(tout_init == 1): #determine destination waypoint
+			up = lost_pnts[-1] #set to most upflow point in last detection point list
+			tout_init = 0
+			L_u = 0.5	#constant for how much upflow from last detected location auv should go
+			L_c = 0.2	#constant for how much cross flow from last detected location auv should go
+			#set destination to a point that is upflow and cross the flow from last detected point
+			new_waypoint = np.array([ldp[0]-L_u, ldp[1]-(lhs*L_c), ldp[2]])
+
+		#has gotten close enough to designated ldp waypoint
+		R = 0.25	#distance threshold to find new ldp waypoint
+		if(np.linalg.norm(auv_location - new_waypoint) < R):
+			tout_init = 1
+			S = src_check()
+			if(S):
+				alg_state = 5 #source has been found
+			else:
+				alg_state = 4 #go to reacquire
+
+		#go to ldp waypoint
+		else:
+			#create waypoint message
+			wp = Waypoint()
+			wp.header.stamp = rospy.Time.now()
+			wp.header.frame_id = "world"
+			wp.point.x = new_waypoint[0]
+			wp.point.y = new_waypoint[1]
+			wp.point.z = new_waypoint[2]
+			wp.max_forward_speed = 0.4
+			wp.heading_offset = 0.0
+			wp.use_fixed_heading = False
+
+			#rosservice call to Go_To
+			try:
+				res = gotoservice(wp,wp.max_forward_speed,str(interpolator))
+				print("Go To service call successful: " + str(res))
+			except rospy.ServiceException, e:
+				print("Service call failed: %s"%e)
 
 #callback function for particle concentration subscriber
 def readconcentration(msg):
@@ -130,7 +185,7 @@ if __name__=='__main__':
 		raise rospy.ROSException('Service proxy failed, error=%s', str(e))
 
 	while not rospy.is_shutdown():
-		#running the algorithm to quickly makes for some... interesting AUV behavior
+		#running the algorithm to quickly makes for some... interesting AUV behavior (namely breakdancing)
 		r = rospy.Rate(1)
 		r.sleep()
 		if(particle_concentration > 0):
