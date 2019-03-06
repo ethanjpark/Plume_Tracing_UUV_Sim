@@ -18,14 +18,19 @@ from uuv_sensor_ros_plugins_msgs.msg import ChemicalParticleConcentration
 from geometry_msgs.msg import Point, Vector3, Twist, TwistWithCovariance
 from nav_msgs.msg import Odometry
 
+#CONSTANTS
 THRESHOLD = 0.005 					#particle concentration threshold for detecting plume
-CURRENT_FLOW = np.array([1.0, 0.0]) # [x,y] vector of the current flow
+CURRENT_FLOW = np.array([1.0, 0.0]) #[x,y] vector of the current flow
 BETA_OFFSET = 20 					#angle offset relative to upflow
 UPFLOW = np.array([-1.0, 0.0]) 		#180 rotation of CURRENT_FLOW
-LAMBDA = 500000000 					#plume detection time threshold (0.5 seconds)
+LAMBDA = 2000000000 				#plume detection time threshold (2 seconds)
+R = 0.25							#distance threshold to find new ldp waypoint
+L_u = 0.5							#constant for how much upflow from last detected location auv should go
+L_c = 0.2							#constant for how much cross flow from last detected location auv should go
 
+#Global Vars
 alg_state = 0                   #global var for which state the algorithm is currently in
-								#0 for init, 1 for find, 2 for track-in, 3 for track-out, 4 for reacquire, 5 (maybe) for source declared
+								# 0 for init, 1 for find, 2 for track-in, 3 for track-out, 4 for reacquire, 5 (maybe) for source declared
 particle_concentration = 0.0    #global var for particle concentration
 auv_location = None             #global var for robot position
 auv_heading = None              #global var for robot heading vector
@@ -109,15 +114,16 @@ def track_out(gotoservice,interpolator):
 	else:
 		new_waypoint = None
 		if(tout_init == 1): #determine destination waypoint
-			up = lost_pnts[-1] #set to most upflow point in last detection point list
+			up = np.array([lost_pnts[-1][0], lost_pnts[-1][1]]) #set to most upflow point in last detection point list
 			tout_init = 0
-			L_u = 0.5	#constant for how much upflow from last detected location auv should go
-			L_c = 0.2	#constant for how much cross flow from last detected location auv should go
 			#set destination to a point that is upflow and cross the flow from last detected point
-			new_waypoint = np.array([ldp[0]-L_u, ldp[1]-(lhs*L_c), ldp[2]])
+			rotmatrix = np.array([[np.cos(np.pi/2), -np.sin(np.pi/2)],[np.sin(np.pi/2), np.cos(np.pi/2)]])
+			f_p = np.dot(UPFLOW,rotmatrix) #2D heading
+			f_p = f_p/np.linalg.norm(f_p)
+			f = UPFLOW/np.linalg.norm(UPFLOW)
+			new_waypoint = up - np.dot(L_u,f) - np.dot(L_c*lhs,f_p)
 
 		#has gotten close enough to designated ldp waypoint
-		R = 0.25	#distance threshold to find new ldp waypoint
 		if(np.linalg.norm(auv_location - new_waypoint) < R):
 			tout_init = 1
 			S = src_check()
@@ -134,7 +140,7 @@ def track_out(gotoservice,interpolator):
 			wp.header.frame_id = "world"
 			wp.point.x = new_waypoint[0]
 			wp.point.y = new_waypoint[1]
-			wp.point.z = new_waypoint[2]
+			wp.point.z = lost_pnts[-1][2] #we're only concerned with 2D plume tracing
 			wp.max_forward_speed = 0.4
 			wp.heading_offset = 0.0
 			wp.use_fixed_heading = False
@@ -145,6 +151,29 @@ def track_out(gotoservice,interpolator):
 				print("Go To service call successful: " + str(res))
 			except rospy.ServiceException, e:
 				print("Service call failed: %s"%e)
+
+#function for checking whether source can be determined from ldp list
+def src_check():
+	if(len(lost_pnts) < 3): #not enough data to make conclusion
+		print("Not enough data to determine source.")
+		return False
+	else:
+		v1 = np.array(lost_pnts[-3][0]-lost_pnts[-1][0], lost_pnts[-3][1]-lost_pnts[-1][1]) #vector from 3rd to 1st point (in terms of how upflow)
+		v2 = np.array(lost_pnts[-2][0]-lost_pnts[-1][0], lost_pnts[-2][1]-lost_pnts[-1][1])	#vector from 2nd to 1st point (in terms of how upflow)
+		v3 = np.array(lost_pnts[-3][0]-lost_pnts[-2][0], lost_pnts[-3][1]-lost_pnts[-2][1]) #vector from 3rd to 2nd point (in terms of how upflow)
+		#calculate scalar projection of vectors onto upflow vector
+		temp = np.linalg.norm(UPFLOW)
+		print("Calculating distances between three most upflow points in direction of upflow...")
+		p1 = np.dot(UPFLOW, v1)/temp
+		p2 = np.dot(UPFLOW, v2)/temp
+		p3 = np.dot(UPFLOW, v3)/temp
+
+		if(p1 < 4 and p2 < 4 and p3 < 4):
+			print("Source determined!")
+			return True
+		else:
+			print("Data inconclusive, source cannot be determined with accuracy.")
+			return False
 
 #callback function for particle concentration subscriber
 def readconcentration(msg):
