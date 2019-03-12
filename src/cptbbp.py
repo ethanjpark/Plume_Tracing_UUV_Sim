@@ -20,13 +20,13 @@ from nav_msgs.msg import Odometry
 
 #CONSTANTS
 THRESHOLD = 0.004 					#particle concentration threshold for detecting plume
-CURRENT_FLOW = np.array([1.0, 0.0]) #[x,y] vector of the current flow
-BETA_OFFSET = 20 					#angle offset relative to upflow
-UPFLOW = np.array([-1.0, 0.0]) 		#180 rotation of CURRENT_FLOW
+CURRENT_FLOW = np.array([1.0, -1.0]) #[x,y] vector of the current flow
+BETA_OFFSET = 30 					#angle offset relative to upflow
+UPFLOW = np.array([-1.0, 1.0]) 		#180 rotation of CURRENT_FLOW
 LAMBDA = 2.0 						#plume detection time threshold (2 seconds)
 R = 0.1								#distance threshold to find new ldp waypoint
-L_u = 0.5							#constant for how much upflow from last detected location auv should go
-L_c = 0.2							#constant for how much cross flow from last detected location auv should go
+L_u = 2.0							#constant for how much upflow from last detected location auv should go
+L_c = 2.0							#constant for how much cross flow from last detected location auv should go
 startx = 20							#x-component of where auv should start from
 starty = 25							#y-component of where auv should start from
 
@@ -44,11 +44,12 @@ tout_init = 1					#global var indicating whether track-out needs to choose the n
 tout_wp = None					#global var for storing waypoint for track-out behavior
 bowtie_step = -1				#global var for which step of the bowtie maneuver auv is currently performing
 								# 0 = going to center, 1 for upflow left, 2 for downflow left, 3 for upflow right, 4 for downflow right
-upnotcross = 0					#global var indicator for when auv is going upflow not cross (for hitting boundary)
+upnotcross = 1					#global var indicator for when auv is going upflow not cross (for hitting boundary)
 findpos = 1						#global var for indicating which direction of rotation from upflow auv is going
 findbound = 0					#global var indicating which boundary (pos/neg x or pos/neg y) the auv hit
 								# 1 for pos x, 2 for neg x, 3 for pos y, 4 for neg y
 prevfindbound = 0				#global var to keep track of which edge we hit last
+trackincounter = 0				#global var used to only periodically call goto in trackin
 
 #dictionary for mapping alg_state to behaviors
 s2b = {
@@ -105,16 +106,16 @@ def has_reached(a, b, thres):
 def check_bounds(location):
 	global findbound
 
-	if(location[0] > 40):
+	if(location[0] > 100):
 		findbound = 1
 		return False
-	elif(location[0] < -40):
+	elif(location[0] < -100):
 		findbound = 2
 		return False
-	elif(location[1] > 25):
+	elif(location[1] > 50):
 		findbound = 3
 		return False
-	elif(location[1] < -25):
+	elif(location[1] < -50):
 		findbound = 4
 		return False
 	elif(location[2] < -50 or location[2] > 0): #shouldn't really ever trigger but for redundancy
@@ -124,16 +125,16 @@ def check_bounds(location):
 
 #Track In behavior of algorithm
 def track_in(gotoservice,interpolator):
-	global lhs, t_last, ldp, alg_state
+	global lhs, t_last, ldp, alg_state, trackincounter
 
-	if(particle_concentration >= THRESHOLD): #stay in track-in
-		alg_state = 2
-		#calculate lhs var using angle between upflow and auv_heading
-		ang = angle_between(UPFLOW,auv_heading)
-		if(ang > 0): #heading is counter-clockwise from upflow
-			lhs = 1
-		else:
+	trackincounter += 1
+
+	if(not check_bounds(auv_location)): #hit boundary, reflect
+		print("track in hit boundary")
+		if(lhs == 1):
 			lhs = -1
+		elif(lhs == -1):
+			lhs = 1
 
 		#update t_last
 		t_last = rospy.get_time()
@@ -149,6 +150,33 @@ def track_in(gotoservice,interpolator):
 		
 		wp = make_waypoint(new_waypoint[0], new_waypoint[1], new_waypoint[2])
 		call_goto(wp, gotoservice, interpolator)
+
+	elif(particle_concentration >= THRESHOLD): #stay in track-in
+		print("lhs: " + str(lhs))
+		alg_state = 2
+		#calculate lhs var using angle between upflow and auv_heading
+		ang = angle_between(UPFLOW,auv_heading)
+		print(ang)
+		if(ang > 0): #heading is counter-clockwise from upflow
+			lhs = 1
+		else:
+			lhs = -1
+
+		#update t_last
+		t_last = rospy.get_time()
+
+		#update last detection point
+		ldp = auv_location
+
+		#calculate heading and new waypoint
+		offsetrad = lhs*np.deg2rad(BETA_OFFSET)
+		new_heading = np.dot(2,rotate_upflow(offsetrad))
+		threed_heading = np.array([new_heading[0],new_heading[1],0.0])
+		new_waypoint = np.add(threed_heading,auv_location)
+		
+		if(trackincounter%3 == 0):
+			wp = make_waypoint(new_waypoint[0], new_waypoint[1], new_waypoint[2])
+			call_goto(wp, gotoservice, interpolator)
 
 	#lost contact with plume
 	elif(rospy.get_time() - t_last > LAMBDA): #go to track-out
@@ -178,6 +206,9 @@ def track_out(gotoservice,interpolator):
 			f_p = rotate_upflow(np.pi/2)
 			f = UPFLOW/np.linalg.norm(UPFLOW)
 			tout_wp = up - np.dot(L_u,f) - np.dot(L_c*lhs,f_p)
+			wp = make_waypoint(tout_wp[0], tout_wp[1], lost_pnts[-1][2])
+			print("Going somewhere based on ldp.")
+			call_goto(wp, gotoservice, interpolator)
 
 		#has gotten close enough to designated ldp waypoint
 		if(has_reached(auv_location, np.array([tout_wp[0], tout_wp[1], auv_location[2]]), R)):
@@ -189,10 +220,10 @@ def track_out(gotoservice,interpolator):
 				print("Going to reacquire.")
 				alg_state = 4 #go to reacquire
 		#go to ldp waypoint
-		else:
-			wp = make_waypoint(tout_wp[0], tout_wp[1], lost_pnts[-1][2])
-			print("Going somewhere based on ldp.")
-			call_goto(wp, gotoservice, interpolator)
+		# else:
+		# 	wp = make_waypoint(tout_wp[0], tout_wp[1], lost_pnts[-1][2])
+		# 	print("Going somewhere based on ldp.")
+		# 	call_goto(wp, gotoservice, interpolator)
 
 #function for checking whether source can be determined from ldp list
 def src_check():
@@ -299,7 +330,7 @@ def find_plume(gotoservice, interpolator):
 			done = False
 			while(not done):
 				cross += cross
-				if(auv_location[0]+cross[0] < -40 or auv_location[0]+cross[0] > 40 or auv_location[1]+cross[1] < -25 or auv_location[1]+cross[1] > 25):
+				if(auv_location[0]+cross[0] < -100 or auv_location[0]+cross[0] > 100 or auv_location[1]+cross[1] < -50 or auv_location[1]+cross[1] > 50):
 					done = True
 			wp = make_waypoint(auv_location[0]+cross[0], auv_location[1]+cross[1], auv_location[2])
 			call_goto(wp, gotoservice, interpolator)
@@ -324,9 +355,7 @@ def find_plume(gotoservice, interpolator):
 				print("find: going upflow")
 				wp = make_waypoint(auv_location[0]+ufnorm[0], auv_location[1]+ufnorm[1], auv_location[2])
 				call_goto(wp, gotoservice, interpolator)
-			# else: #still within boundary, keep going
-			# 	cross = 2*rotate_upflow(findpos*np.pi/2)
-			# 	wp = make_waypoint(auv_location[0]+cross[0], auv_location[1]+cross[1], auv_location[2])
+
 
 #callback function for particle concentration subscriber
 def readconcentration(msg):

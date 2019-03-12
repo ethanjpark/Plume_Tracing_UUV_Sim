@@ -1,17 +1,16 @@
 <launch>
-
-	<include file="$(find uuv_gazebo_worlds)/launch/ocean_waves.launch"/>
+  <arg name="use_gazebo" default="false"/>
+  
+  <include file="$(find uuv_gazebo_worlds)/launch/ocean_waves.launch">
+      <arg name="gui" value="false"/>
+  </include>
 
   <include file="$(find rexrov2_description)/launch/upload_rexrov2.launch">
     <arg name="mode" value="default"/>
     <arg name="x" value="30"/>
     <arg name="y" value="20"/>
-    <arg name="z" value="-23"/>
+    <arg name="z" value="-21"/>
     <arg name="namespace" value="rexrov2"/>
-  </include>
-
-  <include file="$(find uuv_plume_simulator)/launch/start_current_velocity_server.launch">
-    <arg name="current_velocity_topic" value="/hydrodynamics/current_velocity"/>
   </include>
 
   <include file="$(find uuv_plume_simulator)/launch/start_plume_server.launch">
@@ -22,10 +21,6 @@
     <arg name="uuv_name" value="rexrov2"/>
     <arg name="model_name" value="rexrov2"/>
   </include>
-
-  <!-- <include file="$(find pt_uuvsim)/launch/send_waypoints.launch">
-    <arg name="uuv_name" value="rexrov2"/>
-  </include> -->
 
   <node name="rviz" pkg="rviz" type="rviz" output="screen" args="-d $(find pt_uuvsim)/rviz/everything.rviz"/>
 
