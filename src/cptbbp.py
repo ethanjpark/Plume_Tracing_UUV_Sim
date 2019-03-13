@@ -17,6 +17,7 @@ from uuv_control_msgs.msg import Waypoint
 from uuv_sensor_ros_plugins_msgs.msg import ChemicalParticleConcentration
 from geometry_msgs.msg import Point, Vector3, Twist, TwistWithCovariance
 from nav_msgs.msg import Odometry
+from visualization_msgs.msg import Marker
 
 #CONSTANTS
 THRESHOLD = 0.004 					#particle concentration threshold for detecting plume
@@ -387,6 +388,8 @@ if __name__=='__main__':
 		Odometry,
 		readauvpose)
 
+	markerpub = rospy.Publisher('sourcemarker', Marker, queue_size=1)
+
 	interpolator = rospy.get_param('~interpolator', 'lipb')
 	
 	try:
@@ -439,3 +442,27 @@ if __name__=='__main__':
 				print("Source: [" + str(lost_pnts[-1][0]) + ", " + str(lost_pnts[-1][1]) + ", " + str(lost_pnts[-1][2]) + "]")
 				wp = make_waypoint(lost_pnts[-1][0], lost_pnts[-1][1], lost_pnts[-1][2])
 				call_goto(wp, goto, interpolator)
+
+				marker = Marker()
+				marker.header.frame_id = 'world'
+				marker.header.stamp = rospy.Time.now()
+				marker.id = 0
+				marker.type = Marker.SPHERE
+				marker.action = Marker.ADD
+				marker.pose.position.x = lost_pnts[-1][0]
+				marker.pose.position.y = lost_pnts[-1][1]
+				marker.pose.position.z = lost_pnts[-1][2]
+				marker.pose.orientation.x = 0
+			  	marker.pose.orientation.y = 0
+			  	marker.pose.orientation.z = 0
+			  	marker.pose.orientation.w = 1
+			  	marker.scale.x = 1.0
+			  	marker.scale.y = 1.0
+			  	marker.scale.z = 1.0
+				marker.color.r = 1.0
+				marker.color.g = 1.0
+				marker.color.b = 1.0
+				marker.color.a = 1.0
+				marker.lifetime = rospy.Duration(0)
+
+				markerpub.publish(marker)

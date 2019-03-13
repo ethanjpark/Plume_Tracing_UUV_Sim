@@ -6,8 +6,6 @@ Panels:
       Expanded:
         - /Global Options1
         - /TF1/Frames1
-        - /Plume Visual Marker1
-        - /PointCloud1
       Splitter Ratio: 0.7214760184288025
     Tree Height: 710
   - Class: rviz/Selection
@@ -58,6 +56,127 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
+        rexrov2/base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/camera_link_optical:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/cameraleft_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/cameraleft_link_optical:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/cameraright_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/cameraright_link_optical:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/cc_sensor_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rexrov2/dvl_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/dvl_sonar0_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/dvl_sonar1_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/dvl_sonar2_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/dvl_sonar3_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/gps_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rexrov2/imu_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rexrov2/magnetometer_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/pose_sensor_link_default:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        rexrov2/pressure_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/rpt_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/thruster_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/thruster_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/thruster_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/thruster_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/thruster_4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rexrov2/thruster_5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
       Name: RobotModel
       Robot Description: /rexrov2/robot_description
       TF Prefix: ""
@@ -111,7 +230,7 @@ Visualization Manager:
       Marker Topic: /world_models
       Name: World models
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -142,7 +261,7 @@ Visualization Manager:
       Marker Topic: /rexrov2/waypoint_markers
       Name: Waypoints
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -192,9 +311,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 202.5822296142578
+      Max Intensity: 57.428001403808594
       Min Color: 0; 0; 0
-      Min Intensity: 28.38214874267578
+      Min Intensity: 0
       Name: PointCloud
       Position Transformer: XYZ
       Queue Size: 10
@@ -213,6 +332,14 @@ Visualization Manager:
       Name: Axes
       Radius: 0.10000000149011612
       Reference Frame: <Fixed Frame>
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /sourcemarker
+      Name: Marker
+      Namespaces:
+        {}
+      Queue Size: 1
       Value: true
   Enabled: true
   Global Options:
@@ -239,25 +366,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 174.86676025390625
+      Distance: 45.293663024902344
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 23.002731323242188
-        Y: -17.538349151611328
-        Z: -3.5165600776672363
+        X: 26.004371643066406
+        Y: -6.453929901123047
+        Z: 6.574908256530762
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.010397912934422493
+      Pitch: 0.34039777517318726
       Target Frame: rexrov2/base_link
       Value: Orbit (rviz)
-      Yaw: 4.103647232055664
+      Yaw: 3.1936402320861816
     Saved: ~
 Window Geometry:
   Displays:
