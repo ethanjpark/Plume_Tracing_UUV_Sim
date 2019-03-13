@@ -24,7 +24,7 @@ CURRENT_FLOW = np.array([1.0, -1.0]) #[x,y] vector of the current flow
 BETA_OFFSET = 30 					#angle offset relative to upflow
 UPFLOW = np.array([-1.0, 1.0]) 		#180 rotation of CURRENT_FLOW
 LAMBDA = 2.0 						#plume detection time threshold (2 seconds)
-R = 0.1								#distance threshold to find new ldp waypoint
+R = 0.75								#distance threshold to find new ldp waypoint
 L_u = 2.0							#constant for how much upflow from last detected location auv should go
 L_c = 2.0							#constant for how much cross flow from last detected location auv should go
 startx = 20							#x-component of where auv should start from
@@ -49,7 +49,7 @@ findpos = 1						#global var for indicating which direction of rotation from upf
 findbound = 0					#global var indicating which boundary (pos/neg x or pos/neg y) the auv hit
 								# 1 for pos x, 2 for neg x, 3 for pos y, 4 for neg y
 prevfindbound = 0				#global var to keep track of which edge we hit last
-trackincounter = 0				#global var used to only periodically call goto in trackin
+trackincounter = 3				#global var used to only periodically call goto in trackin
 
 #dictionary for mapping alg_state to behaviors
 s2b = {
@@ -64,14 +64,15 @@ s2b = {
 
 #Calculate angle between two vectors (counter-clockwise positive)
 def angle_between(v1,v2):
-	rad1 = np.arctan2(v1[1],v1[0]) #arctan2 args are y,x (weird)
-	rad2 = np.arctan2(v2[1],v2[0])
-	return np.rad2deg(rad2-rad1)
+	dot = np.dot(v1, v2)
+	det = np.linalg.det(np.array([v1, v2]))
+	return np.rad2deg(np.arctan2(det,dot))
 
 #Calculate normalized rotated vector of upflow
 def rotate_upflow(angle):
 	rotmatrix = np.array([[np.cos(angle), -np.sin(angle)],[np.sin(angle), np.cos(angle)]])
-	new_heading = np.dot(UPFLOW,rotmatrix) #2D heading
+	temp = np.array([[UPFLOW[0]],[UPFLOW[1]]])
+	new_heading = np.dot(rotmatrix, temp) #2D heading
 	new_heading = new_heading/np.linalg.norm(new_heading)
 	return new_heading
 
@@ -152,29 +153,31 @@ def track_in(gotoservice,interpolator):
 		call_goto(wp, gotoservice, interpolator)
 
 	elif(particle_concentration >= THRESHOLD): #stay in track-in
-		print("lhs: " + str(lhs))
 		alg_state = 2
-		#calculate lhs var using angle between upflow and auv_heading
-		ang = angle_between(UPFLOW,auv_heading)
-		print(ang)
-		if(ang > 0): #heading is counter-clockwise from upflow
-			lhs = 1
-		else:
-			lhs = -1
+		if(lhs == 0):
+			#calculate lhs var using angle between upflow and auv_heading
+			ang = angle_between(UPFLOW,auv_heading)
+			print("AUV heading: (" + str(auv_heading[0]) + "," + str(auv_heading[1]) + ")")
+			print("Angle between: " + str(ang))
+			if(ang > 0): #heading is counter-clockwise from upflow
+				lhs = 1
+			else:
+				lhs = -1
 
-		#update t_last
-		t_last = rospy.get_time()
+		if(trackincounter%4 == 0):
+			#update t_last
+			t_last = rospy.get_time()
 
-		#update last detection point
-		ldp = auv_location
+			#update last detection point
+			ldp = auv_location
 
-		#calculate heading and new waypoint
-		offsetrad = lhs*np.deg2rad(BETA_OFFSET)
-		new_heading = np.dot(2,rotate_upflow(offsetrad))
-		threed_heading = np.array([new_heading[0],new_heading[1],0.0])
-		new_waypoint = np.add(threed_heading,auv_location)
-		
-		if(trackincounter%3 == 0):
+			#calculate heading and new waypoint
+			print("lhs: " + str(lhs))
+			offsetrad = lhs*np.deg2rad(BETA_OFFSET)
+			new_heading = np.dot(2,rotate_upflow(offsetrad))
+			threed_heading = np.array([new_heading[0],new_heading[1],0.0])
+			new_waypoint = np.add(threed_heading,auv_location)
+			
 			wp = make_waypoint(new_waypoint[0], new_waypoint[1], new_waypoint[2])
 			call_goto(wp, gotoservice, interpolator)
 
@@ -183,6 +186,7 @@ def track_in(gotoservice,interpolator):
 		lost_pnts.append(ldp)
 		print("Lost contact with plume, going to track-out.")
 		alg_state = 3
+		lhs = 0
 
 #Track out behavior of algorithm
 def track_out(gotoservice,interpolator):
@@ -203,7 +207,7 @@ def track_out(gotoservice,interpolator):
 			up = np.array([lost_pnts[-1][0], lost_pnts[-1][1]]) #set to most upflow point in last detection point list
 			tout_init = 0
 			#set destination to a point that is upflow and cross the flow from last detected point
-			f_p = rotate_upflow(np.pi/2)
+			f_p = np.ndarray.flatten(rotate_upflow(np.pi/2))
 			f = UPFLOW/np.linalg.norm(UPFLOW)
 			tout_wp = up - np.dot(L_u,f) - np.dot(L_c*lhs,f_p)
 			wp = make_waypoint(tout_wp[0], tout_wp[1], lost_pnts[-1][2])
@@ -432,6 +436,6 @@ if __name__=='__main__':
 		elif(alg_state == 5): #source found
 			prevstate = 5
 			if(not has_reached(auv_location, lost_pnts[-1], R)): #go to most upflow ldp, which is speculated source
-				print("Source: [" + str(lost_pnts[-1][0]) + ", " + str(lost_pnts[-1][1]) + ", " + str(lost_pnts[-1][2] + "]"))
+				print("Source: [" + str(lost_pnts[-1][0]) + ", " + str(lost_pnts[-1][1]) + ", " + str(lost_pnts[-1][2]) + "]")
 				wp = make_waypoint(lost_pnts[-1][0], lost_pnts[-1][1], lost_pnts[-1][2])
 				call_goto(wp, goto, interpolator)

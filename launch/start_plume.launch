@@ -11,4 +11,7 @@
   <!-- Set current velocity -->
   <node name="currvel" pkg="pt_uuvsim" type="set_currvel" output="screen"/>
 
+  <!-- Start plume tracing code -->
+  <node name="cptbbp" pkg="pt_uuvsim" type="cptbbp.py" output="screen"/>
+
 </launch>
