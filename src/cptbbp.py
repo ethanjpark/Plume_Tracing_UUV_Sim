@@ -45,7 +45,7 @@ tout_wp = None					#global var for storing waypoint for track-out behavior
 bowtie_step = -1				#global var for which step of the bowtie maneuver auv is currently performing
 								# 0 = going to center, 1 for upflow left, 2 for downflow left, 3 for upflow right, 4 for downflow right
 upnotcross = 1					#global var indicator for when auv is going upflow not cross (for hitting boundary)
-findpos = 1						#global var for indicating which direction of rotation from upflow auv is going
+findpos = -1					#global var for indicating which direction of rotation from upflow auv is going
 findbound = 0					#global var indicating which boundary (pos/neg x or pos/neg y) the auv hit
 								# 1 for pos x, 2 for neg x, 3 for pos y, 4 for neg y
 prevfindbound = 0				#global var to keep track of which edge we hit last
