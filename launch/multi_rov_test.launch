@@ -1,0 +1,26 @@
+<launch>
+  <arg name="use_gazebo" default="false"/>
+
+  <include file="$(find uuv_gazebo_worlds)/launch/ocean_waves.launch">
+      <arg name="gui" value="false"/>
+  </include>
+
+  <include file="$(find rexrov2_description)/launch/upload_rexrov2.launch">
+    <arg name="mode" value="default"/>
+    <arg name="x" value="30"/>
+    <arg name="y" value="20"/>
+    <arg name="z" value="-21"/>
+    <arg name="namespace" value="rov1"/>
+  </include>
+
+  <include file="$(find rexrov2_description)/launch/upload_rexrov2.launch">
+    <arg name="mode" value="default"/>
+    <arg name="x" value="10"/>
+    <arg name="y" value="20"/>
+    <arg name="z" value="-21"/>
+    <arg name="namespace" value="rov2"/>
+  </include>
+
+  <node name="rviz" pkg="rviz" type="rviz" output="screen" args="-d $(find pt_uuvsim)/rviz/multibot.rviz"/>
+
+</launch>
