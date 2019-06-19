@@ -21,6 +21,12 @@
     <arg name="namespace" value="rov2"/>
   </include>
 
+  <include file="$(find pt_uuvsim)/launch/multi_bot_controller.launch">
+    <arg name="uuv_name1" value="rov1"/>
+    <arg name="uuv_name2" value="rov2"/>
+    <arg name="model_name" value="rexrov2"/>
+  </include>
+
   <node name="rviz" pkg="rviz" type="rviz" output="screen" args="-d $(find pt_uuvsim)/rviz/multibot.rviz"/>
 
 </launch>
