@@ -14,8 +14,8 @@ from visualization_msgs.msg import Marker
 
 
 #CONSTANTS
-rov1_startx = 50
-rov2_startx = -10
+rov1_startx = 100
+rov2_startx = 80
 starty = 20 
 
 
@@ -25,7 +25,7 @@ auv1_heading = None              #global var for robot heading vector
 auv2_location = None
 auv2_heading = None
 
-
+#see musa's example waypoint for eca a9 in discord
 #Waypoint messsage 'constructor'
 def make_waypoint(newx,newy,newz):
 	#create waypoint message
@@ -35,9 +35,10 @@ def make_waypoint(newx,newy,newz):
 	wp.point.x = newx
 	wp.point.y = newy
 	wp.point.z = newz
-	wp.max_forward_speed = 0.75
+	wp.max_forward_speed = 2.0
 	wp.heading_offset = 0.0
 	wp.use_fixed_heading = False
+	wp.radius_of_acceptance = 0.5
 	return wp
 
 
@@ -75,7 +76,7 @@ if __name__=='__main__':
 		Odometry,
 		readauv2pose)
 	
-	interpolator = rospy.get_param('~interpolator', 'lipb')
+	interpolator = rospy.get_param('~interpolator', 'dubins')
 	
 	try:
 		rospy.wait_for_service('rov1/go_to', timeout=15)
@@ -102,7 +103,7 @@ if __name__=='__main__':
 		r = rospy.Rate(1)
 		r.sleep()
 
-		r1wp1 = make_waypoint(rov1_startx,starty,-21)
-		r2wp1 = make_waypoint(rov2_startx,starty,-21)
+		r1wp1 = make_waypoint(rov1_startx,starty,-31)
+		r2wp1 = make_waypoint(rov2_startx,starty,-31)
 		call_goto(r1wp1,goto1,interpolator)
 		call_goto(r2wp1,goto2,interpolator)
